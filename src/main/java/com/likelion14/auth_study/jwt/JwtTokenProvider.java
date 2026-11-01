@@ -22,30 +22,46 @@ import java.util.List;
 @Component
 public class JwtTokenProvider {
 
+    // 1. 필드
     private final SecretKey key;
-    private final long expirationMs;
+    private final long accessExpirationMs;
+    private final long refreshExpirationMs;
 
+    // 2. 생성자
     public JwtTokenProvider(@Value("${jwt.secret}") String secret,
-                            @Value("${jwt.expiration-ms}") long expirationMs) {
+                            @Value("${jwt.access-expiration-ms}") long accessExpirationMs,
+                            @Value("${jwt.refresh-expiration-ms}") long refreshExpirationMs) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.expirationMs = expirationMs;
+        this.accessExpirationMs = accessExpirationMs;
+        this.refreshExpirationMs = refreshExpirationMs;
     }
 
-    // 토큰 발급
-    public String createToken(String username, String role) {
+    // 3. 토큰 생성
+    // 공통 로직 (private — 외부에서 직접 호출 못 하게)
+    public String createToken(String username, String role, String type, long validityMs) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + expirationMs);
+        Date expiry = new Date(now.getTime() + validityMs);
 
         return Jwts.builder()
                 .subject(username)        // sub 클레임
-                .claim("role", role)      // 커스텀 클레임
+                .claim("role", role)   // 커스텀 클레임
+                .claim("type", type)   // 토큰 종류를 구분하는 클레임
                 .issuedAt(now)            // iat 클레임
                 .expiration(expiry)       // exp 클레임
                 .signWith(key)            // 서명 (여기서 세 번째 조각 생성)
                 .compact();               // 문자열로 합치기
     }
 
-    // 토큰 해석 (서명 검증 + 만료 검사가 여기서 함께 일어남)
+    public String createAccessToken(String username, String role) {
+        return createToken(username, role, "access", accessExpirationMs);
+    }
+
+    public String createRefreshToken(String username) {
+        // Refresh는 재발급에만 쓰이므로 권한 정보 불필요
+        return createToken(username, null, "refresh", refreshExpirationMs);
+    }
+
+    // 4. 토큰 해석 및 검증 (서명 검증 + 만료 검사가 여기서 함께 일어남)
     public Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(key)
@@ -79,5 +95,14 @@ public class JwtTokenProvider {
 
         // 인증 완료된 토큰 객체 (비밀번호 자리는 null — 이미 검증 끝났으니 불필요)
         return UsernamePasswordAuthenticationToken.authenticated(username, null, authorities);
+    }
+
+    // 5. 조회용
+    public String getUsername(String token) {
+        return parseClaims(token).getSubject();
+    }
+
+    public String getType(String token) {
+        return parseClaims(token).get("type", String.class);
     }
 }
