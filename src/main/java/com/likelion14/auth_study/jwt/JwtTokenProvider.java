@@ -6,12 +6,17 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -59,5 +64,20 @@ public class JwtTokenProvider {
             log.warn("유효하지 않은 토큰입니다: {}", e.getMessage());
         }
         return false;
+    }
+
+    // 토큰에서 인증 정보를 꺼내 Security가 이해하는 객체로 변환
+    public Authentication getAuthentication(String token) {
+        Claims claims = parseClaims(token);
+
+        String username = claims.getSubject();                // "yubin"
+        String role = claims.get("role", String.class);       // "ROLE_USER"
+
+        // 권한 목록 생성 (한 사람이 여러 권한을 가질 수 있어서 List)
+        List<GrantedAuthority> authorities =
+                List.of(new SimpleGrantedAuthority(role));
+
+        // 인증 완료된 토큰 객체 (비밀번호 자리는 null — 이미 검증 끝났으니 불필요)
+        return UsernamePasswordAuthenticationToken.authenticated(username, null, authorities);
     }
 }
