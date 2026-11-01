@@ -32,7 +32,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // .requestMatchers("/api/signup", "/api/login", "/session/**", "/error").permitAll()
-                        .requestMatchers("/api/signup", "/api/login", "/api/jwt/**", "/session/**", "/error").permitAll()
+                        .requestMatchers("/api/signup", "/api/login", "/api/jwt/login", "/api/jwt/reissue", "/error").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")   // ADMIN만 접근
                         .anyRequest().authenticated()
                 )
